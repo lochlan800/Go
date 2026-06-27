@@ -105,6 +105,17 @@
 
   .size-select{display:flex;gap:6px;margin:10px 0;}
   .size-select button{flex:1;}
+  .mode-select{display:flex;gap:6px;margin:10px 0 4px;}
+  .mode-select button{flex:1;}
+  .thinking{display:flex;align-items:center;gap:9px;margin-top:10px;color:var(--accent2);font-size:.92rem;}
+  .spinner{
+    width:15px;height:15px;border-radius:50%;
+    border:2px solid #3a4a5a;border-top-color:var(--accent2);
+    display:inline-block;animation:spin .7s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .turn-dot.thinking-pulse{animation:pulse 1s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
 
   label.chk{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.9rem;margin-top:10px;cursor:pointer;}
 
@@ -303,6 +314,14 @@
           <div class="scoreline"><span>⚫ Black captures:</span> <b id="capB">0</b></div>
           <div class="scoreline"><span>⚪ White captures:</span> <b id="capW">0</b></div>
           <div class="msg" id="gameMsg">Tap an intersection to place a stone.</div>
+          <div class="thinking" id="thinking" style="display:none;">
+            <span class="spinner"></span><span id="thinkingText">Computer is thinking…</span>
+          </div>
+        </div>
+
+        <div class="mode-select">
+          <button class="btn" data-mode="human">👥 2 Players</button>
+          <button class="btn" data-mode="computer">🤖 vs Computer</button>
         </div>
 
         <div class="size-select">
@@ -642,18 +661,44 @@ function canvasToPoint(canvas, g, ev){
   const KOMI=6.5;
   let g, toMove, capB, capW, history, lastMove, koPoint, passes, hover=null;
   let showLibs=false;
+  let vsComputer=false;
+  const HUMAN=BLACK, BOT=WHITE;   // in vs-computer mode the player is Black
+  let thinking=false, botTimer=null;
+  const BOT_DELAY=1500;           // ~1.5s "thinking" pause before the bot moves
 
   const turnDot=document.getElementById('turnDot');
   const turnLabel=document.getElementById('turnLabel');
   const gameMsg=document.getElementById('gameMsg');
   const scorePanel=document.getElementById('scorePanel');
+  const thinkingEl=document.getElementById('thinking');
+  const thinkingText=document.getElementById('thinkingText');
+
+  function clearBot(){ if(botTimer){clearTimeout(botTimer);botTimer=null;} thinking=false; thinkingEl.style.display='none'; }
 
   function newGame(size){
+    clearBot();
     g=makeGame(size);
     toMove=BLACK; capB=0; capW=0; history=[]; lastMove=null; koPoint=null; passes=0;
     scorePanel.style.display='none';
-    setMsg('Tap an intersection to place a stone.','');
+    setMsg(vsComputer?'You are Black — tap an intersection to make your move.':'Tap an intersection to place a stone.','');
     render(); updateStatus();
+  }
+
+  function isBotTurn(){ return vsComputer && toMove===BOT; }
+
+  // After any move, if it's now the computer's turn, "think" then play.
+  function maybeScheduleBot(){
+    if(!isBotTurn() || passes>=2) return;
+    thinking=true;
+    thinkingEl.style.display='flex';
+    thinkingText.textContent='⚪ White is thinking…';
+    turnDot.classList.add('thinking-pulse');
+    botTimer=setTimeout(()=>{
+      botTimer=null; thinking=false;
+      thinkingEl.style.display='none';
+      turnDot.classList.remove('thinking-pulse');
+      botPlay();
+    }, BOT_DELAY);
   }
   function boardKey(){ return g.board.join(''); }
   function pushHistory(){
@@ -698,6 +743,7 @@ function canvasToPoint(canvas, g, ev){
       return;
     }
     pushHistory();
+    const mover=toMove;
     g.board=res.board;
     // captures credited
     if(res.captured.length>0){
@@ -714,14 +760,16 @@ function canvasToPoint(canvas, g, ev){
     lastMove={x,y};
     passes=0;
     toMove = toMove===BLACK?WHITE:BLACK;
-    if(res.captured.length>0) setMsg('Captured '+res.captured.length+' stone'+(res.captured.length>1?'s':'')+'!','good');
+    if(res.captured.length>0) setMsg((mover===BLACK?'Black':'White')+' captured '+res.captured.length+' stone'+(res.captured.length>1?'s':'')+'!','good');
     else setMsg('','');
     scorePanel.style.display='none';
     render(); updateStatus();
+    maybeScheduleBot();
   }
 
   function pass(){
     pushHistory();
+    const passer=toMove;
     passes++;
     koPoint=null;
     lastMove=null;
@@ -730,15 +778,19 @@ function canvasToPoint(canvas, g, ev){
       setMsg('Both players passed — game over. Counting score…','good');
       countScore();
     } else {
-      setMsg((toMove===BLACK?'White':'Black')+' passed. '+(toMove===BLACK?'Black':'White')+' to move. (Pass again to end the game.)','');
+      setMsg((passer===BLACK?'Black':'White')+' passed. '+(toMove===BLACK?'Black':'White')+' to move. (Pass again to end the game.)','');
+      maybeScheduleBot();
     }
     render(); updateStatus();
   }
 
   function undo(){
+    clearBot();
     if(!history.length){ setMsg('Nothing to undo.','warn'); return; }
-    const h=history.pop();
-    g.board=h.board; toMove=h.toMove; capB=h.capB; capW=h.capW; lastMove=h.lastMove; koPoint=h.koPoint; passes=h.passes;
+    const restore=h=>{ g.board=h.board; toMove=h.toMove; capB=h.capB; capW=h.capW; lastMove=h.lastMove; koPoint=h.koPoint; passes=h.passes; };
+    restore(history.pop());
+    // in vs-computer mode, step back past the bot's reply to the player's turn
+    if(vsComputer && toMove!==HUMAN && history.length) restore(history.pop());
     scorePanel.style.display='none';
     setMsg('Move undone.','');
     render(); updateStatus();
@@ -782,8 +834,106 @@ function canvasToPoint(canvas, g, ev){
     scorePanel.style.display='block';
   }
 
+  /* ---- Beginner computer opponent ----
+     A simple heuristic bot: capture when it can, save its own stones in
+     atari, avoid self-atari and filling its own eyes, and otherwise build
+     near existing stones away from the very edge. Good enough to give a
+     newcomer a real game without being crushing. */
+  function isOwnEye(x,y,color){
+    // empty point whose orthogonal neighbours are all `color` (edge counts as wall)
+    if(g.board[idx(g,x,y)]!==EMPTY) return false;
+    for(const [nx,ny] of neighbors(g,x,y)){
+      if(g.board[idx(g,nx,ny)]!==color) return false;
+    }
+    return neighbors(g,x,y).length>0;
+  }
+  function nearestStoneDist(x,y){
+    let best=99;
+    for(let yy=0;yy<g.size;yy++)for(let xx=0;xx<g.size;xx++){
+      if(g.board[idx(g,xx,yy)]!==EMPTY){
+        const d=Math.abs(xx-x)+Math.abs(yy-y);
+        if(d<best)best=d;
+      }
+    }
+    return best;
+  }
+  function chooseBotMove(){
+    const enemy=HUMAN, me=BOT;
+    let best=null, bestScore=-1e9;
+    const empties=[];
+    let stonesOnBoard=false;
+    for(let i=0;i<g.board.length;i++) if(g.board[i]!==EMPTY) stonesOnBoard=true;
+
+    for(let y=0;y<g.size;y++)for(let x=0;x<g.size;x++){
+      if(g.board[idx(g,x,y)]!==EMPTY) continue;
+      if(koPoint && koPoint.x===x && koPoint.y===y) continue;
+      const res=tryMove(g,x,y,me);
+      if(!res.ok) continue;
+      if(isOwnEye(x,y,me)) continue; // never fill our own eye
+
+      let score=Math.random()*2;
+      // captures are great
+      score += res.captured.length*120;
+
+      // examine resulting position for the played group
+      const tg=makeGame(g.size); tg.board=res.board;
+      const myGroup=groupInfo(tg,x,y);
+      const myLibs=myGroup.libs.size;
+
+      // rescue: was an adjacent friendly group in atari, and are we now safe?
+      let rescueNeeded=false;
+      for(const [nx,ny] of neighbors(g,x,y)){
+        if(g.board[idx(g,nx,ny)]===me){
+          const fg=groupInfo(g,nx,ny);
+          if(fg.libs.size===1) rescueNeeded=true;
+        }
+      }
+      if(rescueNeeded && myLibs>=2) score+=45;
+
+      // avoid self-atari (unless it captured something)
+      if(myLibs===1 && res.captured.length===0) score-=60;
+      else score += Math.min(myLibs,4)*1.5;
+
+      // put the opponent in atari / keep pressure
+      for(const [nx,ny] of neighbors(tg,x,y)){
+        if(tg.board[idx(tg,nx,ny)]===enemy){
+          const eg=groupInfo(tg,nx,ny);
+          if(eg.libs.size===1) score+=9;
+          else if(eg.libs.size===2) score+=2;
+        }
+      }
+
+      // positional: avoid the 1st line early, like the 3rd/4th line, build near stones
+      const line=Math.min(x,y,g.size-1-x,g.size-1-y);
+      if(line===0) score-=4; else if(line===1) score+=1; else if(line<=3) score+=3; else score+=1.5;
+
+      if(stonesOnBoard){
+        const d=nearestStoneDist(x,y);
+        if(d===2) score+=5; else if(d===1) score+=2; else if(d===3) score+=3; else score-=d*0.6;
+      } else {
+        // empty board: head for a star point / near centre
+        const c=(g.size-1)/2;
+        score-= (Math.abs(x-c)+Math.abs(y-c))*0.3;
+      }
+
+      if(score>bestScore){ bestScore=score; best={x,y}; }
+    }
+    return {best, bestScore};
+  }
+  function botPlay(){
+    if(!isBotTurn()) return;
+    const {best,bestScore}=chooseBotMove();
+    // Pass when there's nothing worthwhile left — especially after the human passed.
+    if(!best || (passes>=1 && bestScore<3)){
+      pass();
+      return;
+    }
+    place(best.x, best.y);
+  }
+
   // events
   canvas.addEventListener('click',ev=>{
+    if(thinking || isBotTurn()) return;   // ignore clicks during the computer's turn
     const p=canvasToPoint(canvas,g,ev);
     if(!p)return;
     place(p.x,p.y);
@@ -796,7 +946,7 @@ function canvasToPoint(canvas, g, ev){
   });
   canvas.addEventListener('mouseleave',()=>{ if(hover){hover=null;render();} });
 
-  document.getElementById('passBtn').addEventListener('click',pass);
+  document.getElementById('passBtn').addEventListener('click',()=>{ if(thinking||isBotTurn())return; pass(); });
   document.getElementById('undoBtn').addEventListener('click',undo);
   document.getElementById('newBtn').addEventListener('click',()=>newGame(g.size));
   document.getElementById('scoreBtn').addEventListener('click',countScore);
@@ -809,8 +959,19 @@ function canvasToPoint(canvas, g, ev){
       newGame(parseInt(b.dataset.size,10));
     });
   });
-  // default 9x9
+
+  document.querySelectorAll('.mode-select button').forEach(b=>{
+    b.addEventListener('click',()=>{
+      document.querySelectorAll('.mode-select button').forEach(x=>x.classList.remove('primary'));
+      b.classList.add('primary');
+      vsComputer = b.dataset.mode==='computer';
+      newGame(g.size);
+    });
+  });
+
+  // defaults: 9x9, two-player
   document.querySelector('.size-select button[data-size="9"]').classList.add('primary');
+  document.querySelector('.mode-select button[data-mode="human"]').classList.add('primary');
   newGame(9);
 })();
 </script>
