@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Learn Go — The Ancient Game of Strategy</title>
+<style>
+  :root{
+    --board:#dcb35c;
+    --line:#3a2a12;
+    --bg:#14110d;
+    --panel:#211b13;
+    --panel2:#2c241a;
+    --accent:#e0a23b;
+    --accent2:#7fb3d5;
+    --text:#f2e9d8;
+    --muted:#b6a98c;
+    --good:#7bc96f;
+    --bad:#e06b6b;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:radial-gradient(circle at 50% -10%,#241d14,#14110d 60%);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.6;
+    min-height:100vh;
+  }
+  header{
+    text-align:center;
+    padding:34px 16px 18px;
+  }
+  header h1{
+    margin:0;
+    font-size:2.4rem;
+    letter-spacing:.5px;
+    background:linear-gradient(90deg,#e0a23b,#f2e9d8);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  header p{margin:8px 0 0;color:var(--muted);}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 16px 60px;}
+
+  /* Tabs */
+  nav.tabs{
+    display:flex;flex-wrap:wrap;gap:8px;justify-content:center;
+    margin:18px 0 26px;
+  }
+  nav.tabs button{
+    background:var(--panel);color:var(--muted);
+    border:1px solid #3a2f20;border-radius:999px;
+    padding:9px 18px;font-size:.95rem;cursor:pointer;transition:.15s;
+  }
+  nav.tabs button:hover{color:var(--text);border-color:var(--accent);}
+  nav.tabs button.active{background:var(--accent);color:#1a140a;border-color:var(--accent);font-weight:600;}
+
+  section.page{display:none;animation:fade .3s ease;}
+  section.page.active{display:block;}
+  @keyframes fade{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+
+  .card{
+    background:var(--panel);border:1px solid #34291b;border-radius:14px;
+    padding:22px 24px;margin:0 0 20px;
+  }
+  .card h2{margin-top:0;color:var(--accent);}
+  .card h3{color:var(--accent2);margin-bottom:6px;}
+  .card p{color:var(--text);}
+  .card ul{color:var(--text);}
+  .lead{font-size:1.08rem;color:var(--muted);}
+  code.k{background:#000;color:var(--accent);padding:1px 7px;border-radius:6px;font-size:.9em;}
+  .pill{display:inline-block;background:var(--panel2);border:1px solid #3a2f20;border-radius:8px;padding:2px 10px;margin:2px;color:var(--muted);font-size:.85rem;}
+
+  /* Layout for play page */
+  .play-grid{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start;justify-content:center;}
+  .board-col{flex:0 0 auto;}
+  .side-col{flex:1 1 280px;min-width:260px;max-width:380px;}
+
+  canvas{
+    background:var(--board);border-radius:8px;display:block;
+    box-shadow:0 10px 30px rgba(0,0,0,.5);cursor:pointer;
+    touch-action:manipulation;
+  }
+
+  .controls{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;}
+  button.btn{
+    background:var(--panel2);color:var(--text);border:1px solid #3f3322;
+    border-radius:9px;padding:9px 14px;cursor:pointer;font-size:.9rem;transition:.15s;
+  }
+  button.btn:hover{border-color:var(--accent);background:#352b1d;}
+  button.btn.primary{background:var(--accent);color:#1a140a;border-color:var(--accent);font-weight:600;}
+  button.btn:disabled{opacity:.4;cursor:not-allowed;}
+
+  .status{
+    background:var(--panel2);border:1px solid #3a2f20;border-radius:11px;
+    padding:14px 16px;margin-bottom:14px;
+  }
+  .turn-dot{display:inline-block;width:16px;height:16px;border-radius:50%;vertical-align:-2px;margin-right:8px;border:1px solid #00000055;}
+  .turn-dot.black{background:radial-gradient(circle at 35% 30%,#555,#000);}
+  .turn-dot.white{background:radial-gradient(circle at 35% 30%,#fff,#cfcfcf);}
+  .scoreline{display:flex;justify-content:space-between;margin:4px 0;color:var(--muted);}
+  .scoreline b{color:var(--text);}
+  .msg{min-height:1.4em;color:var(--accent2);font-size:.92rem;margin-top:6px;}
+  .msg.warn{color:var(--bad);}
+  .msg.good{color:var(--good);}
+
+  .size-select{display:flex;gap:6px;margin:10px 0;}
+  .size-select button{flex:1;}
+
+  label.chk{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.9rem;margin-top:10px;cursor:pointer;}
+
+  /* Lesson interactive mini boards */
+  .lesson-board{margin:14px 0;}
+  .hint{background:#1c2530;border-left:3px solid var(--accent2);padding:10px 14px;border-radius:0 8px 8px 0;margin:12px 0;color:#cfe2f0;}
+  .tip{background:#2a2410;border-left:3px solid var(--accent);padding:10px 14px;border-radius:0 8px 8px 0;margin:12px 0;color:#f0e4c0;}
+
+  footer{text-align:center;color:#6f6450;padding:30px 16px;font-size:.85rem;}
+  a{color:var(--accent2);}
+  .diagram-cap{color:var(--muted);font-size:.88rem;text-align:center;margin-top:6px;}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+  @media(max-width:640px){.two-col{grid-template-columns:1fr;}}
+  .step-num{display:inline-flex;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#1a140a;font-weight:700;align-items:center;justify-content:center;margin-right:8px;font-size:.9rem;}
+</style>
+</head>
+<body>
+<header>
+  <h1>⚫⚪ Learn Go</h1>
+  <p>The ancient game of strategy — read the lessons, then play on a real board.</p>
+</header>
+
+<div class="wrap">
+  <nav class="tabs" id="tabs">
+    <button data-tab="intro" class="active">Start Here</button>
+    <button data-tab="rules">The Rules</button>
+    <button data-tab="capture">Capturing</button>
+    <button data-tab="territory">Territory & Winning</button>
+    <button data-tab="tips">Beginner Tips</button>
+    <button data-tab="play">▶ Play Now</button>
+  </nav>
+
+  <!-- ===================== INTRO ===================== -->
+  <section class="page active" id="intro">
+    <div class="card">
+      <h2>What is Go?</h2>
+      <p class="lead">Go is one of the oldest board games in the world — invented in China over 2,500 years ago, and hugely popular across China, Japan, and Korea. It's known as <b>Go</b> (Japanese), <b>Weiqi</b> (Chinese), and <b>Baduk</b> (Korean).</p>
+      <p>The rules are astonishingly simple — you could learn them in five minutes — but the strategy is so deep that humans still discover new ideas after a lifetime of play. Players take turns placing stones on a grid, trying to surround more <b>territory</b> (empty space) than their opponent.</p>
+      <div class="tip">🎯 <b>The one-sentence goal:</b> Use your stones to surround and control more empty space than your opponent. Whoever controls more of the board wins.</div>
+    </div>
+
+    <div class="card">
+      <h2>How this app works</h2>
+      <p>Go through the tabs at the top in order:</p>
+      <p><span class="step-num">1</span><b>The Rules</b> — how stones are placed and the two simple laws of the game.</p>
+      <p><span class="step-num">2</span><b>Capturing</b> — how to take your opponent's stones off the board (with little practice boards).</p>
+      <p><span class="step-num">3</span><b>Territory & Winning</b> — how the game ends and how the winner is decided.</p>
+      <p><span class="step-num">4</span><b>Beginner Tips</b> — a handful of ideas that instantly make you better.</p>
+      <p><span class="step-num">5</span><b>Play Now</b> — a full interactive board with two players (or play both sides yourself to practise). It enforces all the rules and counts the score for you.</p>
+      <div class="hint">💡 New to Go? Start on a small <b>9×9</b> board. Games are quick and you'll see the whole story of a game in just a few minutes. The big <b>19×19</b> board is the traditional size for serious play.</div>
+    </div>
+  </section>
+
+  <!-- ===================== RULES ===================== -->
+  <section class="page" id="rules">
+    <div class="card">
+      <h2>The Board & The Stones</h2>
+      <p>Go is played on a grid of lines. Stones are placed on the <b>intersections</b> (the points where lines cross) — <i>not</i> inside the squares like chess. The standard board is 19×19 lines, but beginners usually start on 9×9 or 13×13.</p>
+      <ul>
+        <li><b>Black moves first</b>, then players alternate.</li>
+        <li>Once placed, a stone <b>never moves</b>. It only leaves the board if it is captured.</li>
+        <li>You may place a stone on any empty intersection (with two small exceptions you'll learn next).</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>Liberties — the heartbeat of Go</h2>
+      <p>Every stone breathes through its <b>liberties</b>: the empty points <b>directly next to it</b> (up, down, left, right — <u>not</u> diagonally).</p>
+      <div class="lesson-board">
+        <canvas id="lib1" width="300" height="300"></canvas>
+      </div>
+      <p class="diagram-cap">A single black stone in the centre has <b>4 liberties</b> (the four marked empty points). A stone on the edge has 3; in the corner, only 2.</p>
+      <div class="hint">🫁 When a stone (or a connected group of stones) has its <b>last liberty</b> filled by the enemy, it is <b>captured</b> and removed from the board. That's the whole engine of the game.</div>
+      <p>Stones of the same colour that touch side-by-side form a <b>group</b> and share their liberties — they live or die together. Connecting your stones makes them stronger.</p>
+    </div>
+
+    <div class="card">
+      <h2>The two special rules</h2>
+      <h3>1. Suicide is not allowed</h3>
+      <p>You may not place a stone where it would have <b>no liberties</b> — unless that same move captures enemy stones (which then frees up space). The board in this app enforces this automatically.</p>
+      <h3>2. The Ko rule (no instant repeats)</h3>
+      <p>You cannot make a move that recreates the <b>exact same board position</b> as your previous turn. This prevents an endless loop where two players capture the same single stone back and forth forever. You'll see this called out as "Ko" when you play.</p>
+      <div class="tip">✅ That's genuinely it. Place stones, surround to capture, don't suicide, don't repeat. Everything else is strategy.</div>
+    </div>
+  </section>
+
+  <!-- ===================== CAPTURE ===================== -->
+  <section class="page" id="capture">
+    <div class="card">
+      <h2>Capturing stones</h2>
+      <p>To capture, you fill in <b>all</b> the liberties of an enemy stone or group. The moment the last liberty is gone, those stones are lifted off the board and become your <b>prisoners</b>.</p>
+      <div class="two-col">
+        <div>
+          <div class="lesson-board"><canvas id="cap1" width="260" height="260"></canvas></div>
+          <p class="diagram-cap">This white stone has just <b>one liberty</b> left (marked ✕). It's in <b>atari</b> — one move from capture.</p>
+        </div>
+        <div>
+          <div class="lesson-board"><canvas id="cap2" width="260" height="260"></canvas></div>
+          <p class="diagram-cap">Black fills that last point — white is <b>captured</b> and removed.</p>
+        </div>
+      </div>
+      <div class="hint">⚠️ <b>"Atari"</b> is the most important word for beginners. It means a stone or group has only one liberty left and can be captured next turn. When you're in atari, you usually want to either run (add a stone to gain liberties) or connect to a friendly group — or accept the loss if it's small.</div>
+    </div>
+
+    <div class="card">
+      <h2>Try it yourself: make the capture</h2>
+      <p>White (⚪) is in atari. There is exactly one empty point that will capture it. <b>Click that point</b> to play a black stone and take the white stones off the board.</p>
+      <div class="lesson-board"><canvas id="puzzle" width="320" height="320"></canvas></div>
+      <p class="msg" id="puzzleMsg">Black to play — find the capturing move.</p>
+      <button class="btn" id="puzzleReset">Reset puzzle</button>
+    </div>
+
+    <div class="card">
+      <h2>Why you can't just be captured everywhere: eyes & life</h2>
+      <p>A group of stones is <b>alive forever</b> (uncapturable) if it surrounds <b>two separate empty points</b> inside itself. These internal empty points are called <b>eyes</b>.</p>
+      <div class="lesson-board"><canvas id="eyes" width="300" height="300"></canvas></div>
+      <p class="diagram-cap">This black group has <b>two eyes</b> (the two inner empty points). White can never fill both at once — filling one would be suicide — so this group can never be captured. It is <b>alive</b>.</p>
+      <div class="tip">👁️👁️ <b>The golden rule of survival:</b> a group with two real eyes is permanently alive. Making your groups live (and your opponent's die) is the central battle of every game.</div>
+    </div>
+  </section>
+
+  <!-- ===================== TERRITORY ===================== -->
+  <section class="page" id="territory">
+    <div class="card">
+      <h2>How the game ends</h2>
+      <p>The game doesn't run until the board is full. It ends when <b>both players pass</b> in a row — meaning neither sees a useful move left. Then you count the score.</p>
+      <p>You'd pass when the borders between black and white are settled and playing more stones would only fill your own territory (which loses you points).</p>
+    </div>
+
+    <div class="card">
+      <h2>Counting the score</h2>
+      <p>Your score is your <b>territory</b> plus (depending on scoring style) your captures:</p>
+      <ul>
+        <li><b>Territory</b> = empty points completely surrounded by only your colour.</li>
+        <li><b>Captures / prisoners</b> = enemy stones you removed.</li>
+      </ul>
+      <p>This app uses simple <b>area scoring</b>: your score = (your stones on the board) + (empty points surrounded only by you). Highest score wins.</p>
+      <div class="lesson-board"><canvas id="terr" width="340" height="340"></canvas></div>
+      <p class="diagram-cap">Black surrounds the empty points on the left; white surrounds the right. Each empty region counts for whoever walls it off. Points touching both colours are neutral (no one's).</p>
+      <div class="hint">⚖️ <b>Komi:</b> because Black moves first (an advantage), White is given a few bonus points to compensate — typically <b>6.5</b>. The half-point also guarantees there's never a tie. This app applies komi for you.</div>
+    </div>
+
+    <div class="card">
+      <h2>So how do I actually win?</h2>
+      <p>Control more of the board than your opponent. You do that by:</p>
+      <ul>
+        <li>Sketching out large frameworks of territory in the opening.</li>
+        <li>Keeping your own groups alive (two eyes!).</li>
+        <li>Reducing or invading your opponent's areas.</li>
+        <li>Capturing weak enemy groups when you can.</li>
+      </ul>
+      <p>You almost never need to capture <i>everything</i>. Winning by even half a point is a win. Go rewards balance and patience over pure aggression.</p>
+    </div>
+  </section>
+
+  <!-- ===================== TIPS ===================== -->
+  <section class="page" id="tips">
+    <div class="card">
+      <h2>Beginner tips that instantly help</h2>
+      <p><span class="step-num">1</span><b>Corners → Sides → Centre.</b> Territory is easiest to build in the corners (the edges do part of the walling for you), harder on the sides, and hardest in the wide-open centre. Strong players grab corners first.</p>
+      <p><span class="step-num">2</span><b>Don't play too close together.</b> Beginners cram stones in a tight clump. Spread out a little — each stone should be doing new work. But don't spread so thin you can be cut apart.</p>
+      <p><span class="step-num">3</span><b>Stay connected.</b> Connected groups are strong and hard to kill. Isolated single stones are easy targets.</p>
+      <p><span class="step-num">4</span><b>Make two eyes to live.</b> If a group can't make two eyes, it will eventually die. Always know whether your groups are alive.</p>
+      <p><span class="step-num">5</span><b>Watch for atari.</b> If your stone has one liberty left, you're about to lose it. And look for chances to put the <i>opponent</i> in atari.</p>
+      <p><span class="step-num">6</span><b>Sometimes sacrifice.</b> Losing a stone or two to gain a bigger position is good play. Don't desperately save everything.</p>
+      <p><span class="step-num">7</span><b>It's okay to pass.</b> When there's nothing useful left, pass. Filling your own territory loses points.</p>
+      <div class="tip">🌱 The fastest way to improve: play lots of quick <b>9×9</b> games. Don't worry about playing "correctly" — just get a feel for capturing, connecting, and making eyes. Understanding follows experience.</div>
+    </div>
+    <div class="card">
+      <h2>Glossary</h2>
+      <p>
+        <span class="pill">Liberty — empty point next to a stone</span>
+        <span class="pill">Atari — one liberty left (about to be captured)</span>
+        <span class="pill">Eye — empty point surrounded by your group</span>
+        <span class="pill">Group — connected stones of one colour</span>
+        <span class="pill">Ko — the no-instant-repeat rule</span>
+        <span class="pill">Komi — bonus points for White</span>
+        <span class="pill">Territory — empty space you surround</span>
+        <span class="pill">Pass — skip your move</span>
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== PLAY ===================== -->
+  <section class="page" id="play">
+    <div class="play-grid">
+      <div class="board-col">
+        <canvas id="board" width="540" height="540"></canvas>
+      </div>
+      <div class="side-col">
+        <div class="status">
+          <div style="font-size:1.05rem;margin-bottom:8px;">
+            <span class="turn-dot black" id="turnDot"></span>
+            <b id="turnLabel">Black to move</b>
+          </div>
+          <div class="scoreline"><span>⚫ Black captures:</span> <b id="capB">0</b></div>
+          <div class="scoreline"><span>⚪ White captures:</span> <b id="capW">0</b></div>
+          <div class="msg" id="gameMsg">Tap an intersection to place a stone.</div>
+        </div>
+
+        <div class="size-select">
+          <button class="btn" data-size="9">9×9</button>
+          <button class="btn" data-size="13">13×13</button>
+          <button class="btn" data-size="19">19×19</button>
+        </div>
+
+        <div class="controls">
+          <button class="btn primary" id="passBtn">Pass</button>
+          <button class="btn" id="undoBtn">Undo</button>
+          <button class="btn" id="newBtn">New game</button>
+          <button class="btn" id="scoreBtn">Count score</button>
+        </div>
+
+        <label class="chk"><input type="checkbox" id="showLibs"> Show liberty hints on hover</label>
+
+        <div class="status" id="scorePanel" style="display:none;margin-top:14px;">
+          <h3 style="margin:0 0 8px;color:var(--accent)">Result</h3>
+          <div class="scoreline"><span>⚫ Black area:</span> <b id="areaB">0</b></div>
+          <div class="scoreline"><span>⚪ White area + komi:</span> <b id="areaW">0</b></div>
+          <div class="msg good" id="winnerMsg"></div>
+          <p style="font-size:.82rem;color:var(--muted);margin:8px 0 0;">Area scoring (stones + surrounded empty points), komi 6.5. For accurate scoring, play out all boundaries and remove dead groups before counting.</p>
+        </div>
+
+        <p style="font-size:.82rem;color:var(--muted);margin-top:14px;">
+          Playing against a friend? Take turns on the same screen. Practising alone? Play both colours and try to capture yourself — it's the best way to learn.
+        </p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<footer>
+  Built to help you learn Go (Weiqi / Baduk). Place stones, surround territory, have fun. ⚫⚪
+</footer>
+
+<script>
+/* ============================================================
+   Tab navigation
+   ============================================================ */
+const tabs = document.getElementById('tabs');
+tabs.addEventListener('click', e=>{
+  const btn = e.target.closest('button[data-tab]');
+  if(!btn) return;
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('section.page').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(btn.dataset.tab).classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+});
+
+/* ============================================================
+   Shared Go engine (used by puzzle + main board)
+   Board stored as 1D array: 0 empty, 1 black, 2 white
+   ============================================================ */
+const EMPTY=0, BLACK=1, WHITE=2;
+
+function makeGame(size){
+  return { size, board:new Array(size*size).fill(EMPTY) };
+}
+const idx=(g,x,y)=>y*g.size+x;
+const inB=(g,x,y)=>x>=0&&y>=0&&x<g.size&&y<g.size;
+function neighbors(g,x,y){
+  const r=[];
+  if(x>0)r.push([x-1,y]);
+  if(x<g.size-1)r.push([x+1,y]);
+  if(y>0)r.push([x,y-1]);
+  if(y<g.size-1)r.push([x,y+1]);
+  return r;
+}
+// flood fill a group, return {stones:[[x,y]...], libs:Set of "x,y"}
+function groupInfo(g,x,y){
+  const color=g.board[idx(g,x,y)];
+  if(color===EMPTY)return null;
+  const seen=new Set(), stones=[], libs=new Set();
+  const stack=[[x,y]]; seen.add(x+','+y);
+  while(stack.length){
+    const [cx,cy]=stack.pop();
+    stones.push([cx,cy]);
+    for(const [nx,ny] of neighbors(g,cx,cy)){
+      const v=g.board[idx(g,nx,ny)];
+      const key=nx+','+ny;
+      if(v===EMPTY){ libs.add(key); }
+      else if(v===color && !seen.has(key)){ seen.add(key); stack.push([nx,ny]); }
+    }
+  }
+  return {color,stones,libs};
+}
+// attempt a move. returns {ok, captured:[[x,y]...], board:newBoardArray} or {ok:false,reason}
+function tryMove(g, x, y, color){
+  if(!inB(g,x,y)) return {ok:false,reason:'off-board'};
+  if(g.board[idx(g,x,y)]!==EMPTY) return {ok:false,reason:'occupied'};
+  const test=makeGame(g.size);
+  test.board=g.board.slice();
+  test.board[idx(test,x,y)]=color;
+  const enemy=color===BLACK?WHITE:BLACK;
+  let captured=[];
+  // capture enemy groups with no liberties
+  const checked=new Set();
+  for(const [nx,ny] of neighbors(test,x,y)){
+    if(test.board[idx(test,nx,ny)]===enemy && !checked.has(nx+','+ny)){
+      const gi=groupInfo(test,nx,ny);
+      gi.stones.forEach(s=>checked.add(s[0]+','+s[1]));
+      if(gi.libs.size===0){
+        gi.stones.forEach(s=>{ test.board[idx(test,s[0],s[1])]=EMPTY; captured.push(s); });
+      }
+    }
+  }
+  // suicide check
+  const self=groupInfo(test,x,y);
+  if(self.libs.size===0 && captured.length===0){
+    return {ok:false,reason:'suicide'};
+  }
+  return {ok:true, captured, board:test.board};
+}
+
+/* ============================================================
+   Generic board renderer
+   ============================================================ */
+function drawBoard(canvas, g, opts={}){
+  const ctx=canvas.getContext('2d');
+  const S=g.size;
+  const W=canvas.width;
+  const pad=W/(S+1);
+  const cell=pad;
+  ctx.clearRect(0,0,W,W);
+  // wood
+  ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--board').trim()||'#dcb35c';
+  // rounded rect
+  const r=8;
+  ctx.beginPath();
+  ctx.moveTo(r,0);ctx.arcTo(W,0,W,W,r);ctx.arcTo(W,W,0,W,r);ctx.arcTo(0,W,0,0,r);ctx.arcTo(0,0,W,0,r);
+  ctx.closePath();ctx.fill();
+  // grid lines
+  ctx.strokeStyle='rgba(40,28,12,.85)';
+  ctx.lineWidth=1;
+  for(let i=0;i<S;i++){
+    const p=pad+i*cell;
+    ctx.beginPath();ctx.moveTo(pad,p);ctx.lineTo(pad+(S-1)*cell,p);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(p,pad);ctx.lineTo(p,pad+(S-1)*cell);ctx.stroke();
+  }
+  // star points
+  const stars=starPoints(S);
+  ctx.fillStyle='rgba(40,28,12,.9)';
+  stars.forEach(([sx,sy])=>{
+    ctx.beginPath();ctx.arc(pad+sx*cell,pad+sy*cell,3,0,7);ctx.fill();
+  });
+  // markers (from opts.markers: array {x,y,type,color})
+  (opts.markers||[]).forEach(m=>{
+    const cx=pad+m.x*cell, cy=pad+m.y*cell;
+    if(m.type==='lib'){
+      ctx.strokeStyle='#1d6fb8';ctx.lineWidth=2;
+      const s=cell*0.18;
+      ctx.beginPath();ctx.moveTo(cx-s,cy-s);ctx.lineTo(cx+s,cy+s);ctx.moveTo(cx+s,cy-s);ctx.lineTo(cx-s,cy+s);ctx.stroke();
+    } else if(m.type==='dot'){
+      ctx.fillStyle=m.color||'#1d6fb8';
+      ctx.beginPath();ctx.arc(cx,cy,cell*0.16,0,7);ctx.fill();
+    } else if(m.type==='terr'){
+      ctx.fillStyle = m.color===BLACK ? 'rgba(20,20,20,.45)' : m.color===WHITE ? 'rgba(255,255,255,.55)' : 'rgba(120,120,120,.25)';
+      const s=cell*0.22;
+      ctx.fillRect(cx-s,cy-s,s*2,s*2);
+    }
+  });
+  // stones
+  const sr=cell*0.46;
+  for(let y=0;y<S;y++)for(let x=0;x<S;x++){
+    const v=g.board[idx(g,x,y)];
+    if(v===EMPTY)continue;
+    const cx=pad+x*cell, cy=pad+y*cell;
+    // shadow
+    ctx.fillStyle='rgba(0,0,0,.28)';
+    ctx.beginPath();ctx.arc(cx+1.5,cy+2,sr,0,7);ctx.fill();
+    const grad=ctx.createRadialGradient(cx-sr*0.4,cy-sr*0.4,sr*0.1,cx,cy,sr);
+    if(v===BLACK){grad.addColorStop(0,'#666');grad.addColorStop(1,'#000');}
+    else{grad.addColorStop(0,'#fff');grad.addColorStop(1,'#c8c8c8');}
+    ctx.fillStyle=grad;
+    ctx.beginPath();ctx.arc(cx,cy,sr,0,7);ctx.fill();
+  }
+  // last-move marker
+  if(opts.last){
+    const cx=pad+opts.last.x*cell, cy=pad+opts.last.y*cell;
+    ctx.strokeStyle = g.board[idx(g,opts.last.x,opts.last.y)]===BLACK ? '#fff' : '#000';
+    ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc(cx,cy,sr*0.45,0,7);ctx.stroke();
+  }
+}
+function starPoints(S){
+  if(S===9)return [[2,2],[6,2],[2,6],[6,6],[4,4]];
+  if(S===13)return [[3,3],[9,3],[3,9],[9,9],[6,6]];
+  if(S===19)return [[3,3],[9,3],[15,3],[3,9],[9,9],[15,9],[3,15],[9,15],[15,15]];
+  return [];
+}
+function canvasToPoint(canvas, g, ev){
+  const rect=canvas.getBoundingClientRect();
+  const scaleX=canvas.width/rect.width, scaleY=canvas.height/rect.height;
+  const px=(ev.clientX-rect.left)*scaleX, py=(ev.clientY-rect.top)*scaleY;
+  const pad=canvas.width/(g.size+1), cell=pad;
+  const x=Math.round((px-pad)/cell), y=Math.round((py-pad)/cell);
+  if(!inB(g,x,y))return null;
+  // ensure click is reasonably close to intersection
+  const dx=px-(pad+x*cell), dy=py-(pad+y*cell);
+  if(Math.hypot(dx,dy) > cell*0.5) return null;
+  return {x,y};
+}
+
+/* ============================================================
+   Static lesson diagrams
+   ============================================================ */
+// Liberties diagram
+(function(){
+  const g=makeGame(5);
+  g.board[idx(g,2,2)]=BLACK;
+  drawBoard(document.getElementById('lib1'),g,{markers:[
+    {x:1,y:2,type:'lib'},{x:3,y:2,type:'lib'},{x:2,y:1,type:'lib'},{x:2,y:3,type:'lib'}
+  ]});
+})();
+// Capture before
+(function(){
+  const g=makeGame(5);
+  g.board[idx(g,2,2)]=WHITE;
+  g.board[idx(g,1,2)]=BLACK;
+  g.board[idx(g,3,2)]=BLACK;
+  g.board[idx(g,2,1)]=BLACK;
+  drawBoard(document.getElementById('cap1'),g,{markers:[{x:2,y:3,type:'lib'}]});
+})();
+// Capture after
+(function(){
+  const g=makeGame(5);
+  g.board[idx(g,1,2)]=BLACK;
+  g.board[idx(g,3,2)]=BLACK;
+  g.board[idx(g,2,1)]=BLACK;
+  g.board[idx(g,2,3)]=BLACK;
+  drawBoard(document.getElementById('cap2'),g,{});
+})();
+// Eyes diagram: black group surrounding two eyes
+(function(){
+  const g=makeGame(6);
+  // a blob of black with two internal empty points (eyes)
+  const blacks=[[1,1],[2,1],[3,1],[4,1],[1,2],[4,2],[1,3],[2,3],[3,3],[4,3],[2,2 ]];
+  // we want two eyes; let's design: black wall around, two separated empties
+  g.board.fill(EMPTY);
+  const shape=[
+    [1,1],[2,1],[3,1],[4,1],
+    [1,2],      [3,2],[4,2],
+    [1,3],[2,3],[3,3],[4,3],
+  ];
+  // eyes at (2,2) and (4,? )... let's make eyes at (2,2) is filled? recompute cleanly:
+  g.board.fill(EMPTY);
+  const stones=[
+    [1,1],[2,1],[3,1],[4,1],
+    [1,2],[3,2],[4,2],
+    [1,3],[2,3],[3,3],[4,3],
+    [4,2]
+  ];
+  // simpler explicit design below
+  g.board.fill(EMPTY);
+  const wall=[[1,1],[2,1],[3,1],[4,1],
+              [1,2],[2,2],[4,2],
+              [1,3],[2,3],[3,3],[4,3]];
+  wall.forEach(([x,y])=>g.board[idx(g,x,y)]=BLACK);
+  // eyes are empty interior points (3,2) and ... need two. Adjust: make (3,2) and another empty surrounded point.
+  // Let's rebuild to guarantee two eyes:
+  g.board.fill(EMPTY);
+  const blackStones=[
+    [1,1],[2,1],[3,1],[4,1],[5,1],
+    [1,2],            [3,2],      [5,2],
+    [1,3],[2,3],[3,3],[4,3],[5,3]
+  ];
+  blackStones.forEach(([x,y])=>{ if(inB(g,x,y)) g.board[idx(g,x,y)]=BLACK; });
+  drawBoard(document.getElementById('eyes'),g,{markers:[
+    {x:2,y:2,type:'dot',color:'#1d6fb8'},{x:4,y:2,type:'dot',color:'#1d6fb8'}
+  ]});
+})();
+// Territory diagram
+(function(){
+  const g=makeGame(7);
+  for(let y=0;y<7;y++){ g.board[idx(g,2,y)]=BLACK; g.board[idx(g,4,y)]=WHITE; }
+  drawBoard(document.getElementById('terr'),g,{markers:(()=>{
+    const m=[];
+    for(let y=0;y<7;y++){ m.push({x:0,y,type:'terr',color:BLACK});m.push({x:1,y,type:'terr',color:BLACK});
+      m.push({x:5,y,type:'terr',color:WHITE});m.push({x:6,y,type:'terr',color:WHITE});
+      m.push({x:3,y,type:'terr',color:0}); }
+    return m;
+  })()});
+})();
+
+/* ============================================================
+   Capture puzzle (interactive)
+   ============================================================ */
+(function(){
+  const canvas=document.getElementById('puzzle');
+  const msg=document.getElementById('puzzleMsg');
+  let g;
+  function setup(){
+    g=makeGame(5);
+    // white group in atari, one capturing point
+    g.board[idx(g,2,2)]=WHITE;
+    g.board[idx(g,2,3)]=WHITE;
+    g.board[idx(g,1,2)]=BLACK;
+    g.board[idx(g,3,2)]=BLACK;
+    g.board[idx(g,2,1)]=BLACK;
+    g.board[idx(g,1,3)]=BLACK;
+    g.board[idx(g,3,3)]=BLACK;
+    // the capturing point is (2,4)
+    msg.textContent='Black to play — find the capturing move.';
+    msg.className='msg';
+    draw();
+  }
+  function draw(){ drawBoard(canvas,g,{markers:[{x:2,y:4,type:'lib'}]}); }
+  canvas.addEventListener('click',ev=>{
+    const p=canvasToPoint(canvas,g,ev);
+    if(!p)return;
+    const res=tryMove(g,p.x,p.y,BLACK);
+    if(!res.ok){ msg.textContent='That point is taken — try the marked liberty.'; msg.className='msg warn'; return; }
+    if(res.captured.length>0){
+      g.board=res.board;
+      msg.textContent='🎉 Captured! You filled white\'s last liberty and removed the group.';
+      msg.className='msg good';
+      drawBoard(canvas,g,{});
+    } else {
+      g.board=res.board;
+      msg.textContent='Legal move, but it didn\'t capture. Reset and aim for the spot that removes white\'s LAST liberty.';
+      msg.className='msg warn';
+      draw();
+    }
+  });
+  document.getElementById('puzzleReset').addEventListener('click',setup);
+  setup();
+})();
+
+/* ============================================================
+   Main playable board
+   ============================================================ */
+(function(){
+  const canvas=document.getElementById('board');
+  const KOMI=6.5;
+  let g, toMove, capB, capW, history, lastMove, koPoint, passes, hover=null;
+  let showLibs=false;
+
+  const turnDot=document.getElementById('turnDot');
+  const turnLabel=document.getElementById('turnLabel');
+  const gameMsg=document.getElementById('gameMsg');
+  const scorePanel=document.getElementById('scorePanel');
+
+  function newGame(size){
+    g=makeGame(size);
+    toMove=BLACK; capB=0; capW=0; history=[]; lastMove=null; koPoint=null; passes=0;
+    scorePanel.style.display='none';
+    setMsg('Tap an intersection to place a stone.','');
+    render(); updateStatus();
+  }
+  function boardKey(){ return g.board.join(''); }
+  function pushHistory(){
+    history.push({board:g.board.slice(),toMove,capB,capW,lastMove,koPoint:koPoint?{...koPoint}:null,passes});
+    if(history.length>400)history.shift();
+  }
+  function setMsg(t,cls){ gameMsg.textContent=t; gameMsg.className='msg'+(cls?' '+cls:''); }
+
+  function updateStatus(){
+    turnDot.className='turn-dot '+(toMove===BLACK?'black':'white');
+    turnLabel.textContent=(toMove===BLACK?'Black':'White')+' to move';
+    document.getElementById('capB').textContent=capB;
+    document.getElementById('capW').textContent=capW;
+  }
+
+  function render(){
+    const markers=[];
+    if(showLibs && hover && g.board[idx(g,hover.x,hover.y)]===EMPTY){
+      // preview move liberties
+      const res=tryMove(g,hover.x,hover.y,toMove);
+      if(res.ok){
+        const tg=makeGame(g.size);tg.board=res.board;
+        const gi=groupInfo(tg,hover.x,hover.y);
+        if(gi) gi.libs.forEach(k=>{const [lx,ly]=k.split(',').map(Number);markers.push({x:lx,y:ly,type:'lib'});});
+      }
+    }
+    drawBoard(canvas,g,{markers,last:lastMove});
+  }
+
+  function place(x,y){
+    if(g.board[idx(g,x,y)]!==EMPTY){ setMsg('That point is already occupied.','warn'); return; }
+    // ko check: disallow recreating board after capture of single stone
+    const res=tryMove(g,x,y,toMove);
+    if(!res.ok){
+      if(res.reason==='suicide') setMsg('Illegal: that move would be suicide (no liberties).','warn');
+      else setMsg('Illegal move there.','warn');
+      return;
+    }
+    // simulate to get key, compare with koPoint rule (superko-lite: compare to position 1 move ago)
+    if(koPoint && koPoint.x===x && koPoint.y===y){
+      setMsg('Illegal: Ko! You can\'t immediately recapture to repeat the position. Play elsewhere first.','warn');
+      return;
+    }
+    pushHistory();
+    g.board=res.board;
+    // captures credited
+    if(res.captured.length>0){
+      if(toMove===BLACK) capB+=res.captured.length; else capW+=res.captured.length;
+    }
+    // set ko point: if exactly one stone captured and the placed stone is now in atari with single stone group
+    koPoint=null;
+    if(res.captured.length===1){
+      const selfGi=groupInfo(g,x,y);
+      if(selfGi.stones.length===1 && selfGi.libs.size===1){
+        koPoint={x:res.captured[0][0], y:res.captured[0][1]};
+      }
+    }
+    lastMove={x,y};
+    passes=0;
+    toMove = toMove===BLACK?WHITE:BLACK;
+    if(res.captured.length>0) setMsg('Captured '+res.captured.length+' stone'+(res.captured.length>1?'s':'')+'!','good');
+    else setMsg('','');
+    scorePanel.style.display='none';
+    render(); updateStatus();
+  }
+
+  function pass(){
+    pushHistory();
+    passes++;
+    koPoint=null;
+    lastMove=null;
+    toMove = toMove===BLACK?WHITE:BLACK;
+    if(passes>=2){
+      setMsg('Both players passed — game over. Counting score…','good');
+      countScore();
+    } else {
+      setMsg((toMove===BLACK?'White':'Black')+' passed. '+(toMove===BLACK?'Black':'White')+' to move. (Pass again to end the game.)','');
+    }
+    render(); updateStatus();
+  }
+
+  function undo(){
+    if(!history.length){ setMsg('Nothing to undo.','warn'); return; }
+    const h=history.pop();
+    g.board=h.board; toMove=h.toMove; capB=h.capB; capW=h.capW; lastMove=h.lastMove; koPoint=h.koPoint; passes=h.passes;
+    scorePanel.style.display='none';
+    setMsg('Move undone.','');
+    render(); updateStatus();
+  }
+
+  // Area scoring: count stones + empty regions surrounded by a single color
+  function countScore(){
+    const S=g.size;
+    let blackArea=0, whiteArea=0;
+    for(let i=0;i<g.board.length;i++){
+      if(g.board[i]===BLACK)blackArea++;
+      else if(g.board[i]===WHITE)whiteArea++;
+    }
+    const visited=new Array(g.board.length).fill(false);
+    for(let y=0;y<S;y++)for(let x=0;x<S;x++){
+      const i=idx(g,x,y);
+      if(g.board[i]!==EMPTY || visited[i])continue;
+      // flood the empty region, track bordering colors
+      const stack=[[x,y]]; visited[i]=true;
+      const region=[]; const borders=new Set();
+      while(stack.length){
+        const [cx,cy]=stack.pop(); region.push([cx,cy]);
+        for(const [nx,ny] of neighbors(g,cx,cy)){
+          const ni=idx(g,nx,ny);
+          const v=g.board[ni];
+          if(v===EMPTY){ if(!visited[ni]){visited[ni]=true;stack.push([nx,ny]);} }
+          else borders.add(v);
+        }
+      }
+      if(borders.size===1){
+        if(borders.has(BLACK))blackArea+=region.length; else whiteArea+=region.length;
+      }
+      // borders.size 0 (empty board) or 2 (neutral) -> nobody
+    }
+    const whiteTotal=whiteArea+KOMI;
+    document.getElementById('areaB').textContent=blackArea;
+    document.getElementById('areaW').textContent=whiteTotal.toFixed(1)+' (incl. '+KOMI+' komi)';
+    const wm=document.getElementById('winnerMsg');
+    if(blackArea>whiteTotal){ wm.textContent='⚫ Black wins by '+(blackArea-whiteTotal).toFixed(1)+' points!'; wm.className='msg good'; }
+    else { wm.textContent='⚪ White wins by '+(whiteTotal-blackArea).toFixed(1)+' points!'; wm.className='msg good'; }
+    scorePanel.style.display='block';
+  }
+
+  // events
+  canvas.addEventListener('click',ev=>{
+    const p=canvasToPoint(canvas,g,ev);
+    if(!p)return;
+    place(p.x,p.y);
+  });
+  canvas.addEventListener('mousemove',ev=>{
+    if(!showLibs){ if(hover){hover=null;render();} return; }
+    const p=canvasToPoint(canvas,g,ev);
+    if(p && (!hover||hover.x!==p.x||hover.y!==p.y)){ hover=p; render(); }
+    else if(!p && hover){ hover=null; render(); }
+  });
+  canvas.addEventListener('mouseleave',()=>{ if(hover){hover=null;render();} });
+
+  document.getElementById('passBtn').addEventListener('click',pass);
+  document.getElementById('undoBtn').addEventListener('click',undo);
+  document.getElementById('newBtn').addEventListener('click',()=>newGame(g.size));
+  document.getElementById('scoreBtn').addEventListener('click',countScore);
+  document.getElementById('showLibs').addEventListener('change',e=>{ showLibs=e.target.checked; if(!showLibs){hover=null;} render(); });
+
+  document.querySelectorAll('.size-select button').forEach(b=>{
+    b.addEventListener('click',()=>{
+      document.querySelectorAll('.size-select button').forEach(x=>x.classList.remove('primary'));
+      b.classList.add('primary');
+      newGame(parseInt(b.dataset.size,10));
+    });
+  });
+  // default 9x9
+  document.querySelector('.size-select button[data-size="9"]').classList.add('primary');
+  newGame(9);
+})();
+</script>
+</body>
+</html>
