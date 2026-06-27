@@ -318,6 +318,7 @@
           <div class="scoreline"><span>⚫ Black captures:</span> <b id="capB">0</b></div>
           <div class="scoreline"><span>⚪ White captures:</span> <b id="capW">0</b></div>
           <div class="msg" id="gameMsg">Tap an intersection to place a stone.</div>
+          <div class="msg warn" id="atariMsg" style="margin-top:4px;"></div>
           <div class="thinking" id="thinking" style="display:none;">
             <span class="spinner"></span><span id="thinkingText">Computer is thinking…</span>
           </div>
@@ -341,6 +342,7 @@
           <button class="btn" id="scoreBtn">Count score</button>
         </div>
 
+        <label class="chk"><input type="checkbox" id="showAtari" checked> ⚠️ Warn me when a group is in atari (about to be captured)</label>
         <label class="chk"><input type="checkbox" id="showLibs"> Show liberty hints on hover</label>
 
         <div class="status" id="scorePanel" style="display:none;margin-top:14px;">
@@ -488,6 +490,10 @@ function drawBoard(canvas, g, opts={}){
       ctx.fillStyle = m.color===BLACK ? 'rgba(20,20,20,.45)' : m.color===WHITE ? 'rgba(255,255,255,.55)' : 'rgba(120,120,120,.25)';
       const s=cell*0.22;
       ctx.fillRect(cx-s,cy-s,s*2,s*2);
+    } else if(m.type==='atari'){
+      // red ring on the single remaining liberty: "fill here = capture"
+      ctx.strokeStyle='#e23b3b';ctx.lineWidth=2.5;
+      ctx.beginPath();ctx.arc(cx,cy,cell*0.30,0,7);ctx.stroke();
     }
   });
   // stones
@@ -505,6 +511,14 @@ function drawBoard(canvas, g, opts={}){
     ctx.fillStyle=grad;
     ctx.beginPath();ctx.arc(cx,cy,sr,0,7);ctx.fill();
   }
+  // atari warning triangles on at-risk stones (drawn on top of stones)
+  (opts.atariStones||[]).forEach(([x,y])=>{
+    const cx=pad+x*cell, cy=pad+y*cell, t=cell*0.20;
+    ctx.fillStyle='#e23b3b';ctx.strokeStyle='#fff';ctx.lineWidth=1;
+    ctx.beginPath();
+    ctx.moveTo(cx,cy-t);ctx.lineTo(cx+t,cy+t*0.85);ctx.lineTo(cx-t,cy+t*0.85);
+    ctx.closePath();ctx.fill();ctx.stroke();
+  });
   // last-move marker
   if(opts.last){
     const cx=pad+opts.last.x*cell, cy=pad+opts.last.y*cell;
@@ -664,7 +678,7 @@ function canvasToPoint(canvas, g, ev){
   const canvas=document.getElementById('board');
   const KOMI=6.5;
   let g, toMove, capB, capW, history, lastMove, koPoint, passes, hover=null;
-  let showLibs=false;
+  let showLibs=false, showAtari=true;
   let vsComputer=false;
   const HUMAN=BLACK, BOT=WHITE;   // in vs-computer mode the player is Black
   let thinking=false, botTimer=null;
@@ -718,8 +732,43 @@ function canvasToPoint(canvas, g, ev){
     document.getElementById('capW').textContent=capW;
   }
 
+  // Find every group with only one liberty (in atari = one move from capture).
+  function computeAtari(){
+    const visited=new Set();
+    const liberties=[];   // the single empty point that would capture each group
+    const stones=[];      // all at-risk stones (to flag with a triangle)
+    const colors=new Set();
+    for(let y=0;y<g.size;y++)for(let x=0;x<g.size;x++){
+      const v=g.board[idx(g,x,y)];
+      if(v===EMPTY || visited.has(x+','+y)) continue;
+      const gi=groupInfo(g,x,y);
+      gi.stones.forEach(s=>visited.add(s[0]+','+s[1]));
+      if(gi.libs.size===1){
+        colors.add(v);
+        const [lx,ly]=[...gi.libs][0].split(',').map(Number);
+        liberties.push({x:lx,y:ly,type:'atari'});
+        gi.stones.forEach(s=>stones.push(s));
+      }
+    }
+    return {liberties,stones,colors};
+  }
+
   function render(){
     const markers=[];
+    let atariStones=[];
+    if(showAtari){
+      const a=computeAtari();
+      markers.push(...a.liberties);
+      atariStones=a.stones;
+      const am=document.getElementById('atariMsg');
+      if(a.colors.size===0){ am.textContent=''; }
+      else {
+        const names=[]; if(a.colors.has(BLACK))names.push('Black'); if(a.colors.has(WHITE))names.push('White');
+        am.textContent='⚠️ '+names.join(' & ')+(names.length>1?' groups are':' has a group')+' in atari — one move from capture (red ▲).';
+      }
+    } else {
+      document.getElementById('atariMsg').textContent='';
+    }
     if(showLibs && hover && g.board[idx(g,hover.x,hover.y)]===EMPTY){
       // preview move liberties
       const res=tryMove(g,hover.x,hover.y,toMove);
@@ -729,7 +778,7 @@ function canvasToPoint(canvas, g, ev){
         if(gi) gi.libs.forEach(k=>{const [lx,ly]=k.split(',').map(Number);markers.push({x:lx,y:ly,type:'lib'});});
       }
     }
-    drawBoard(canvas,g,{markers,last:lastMove});
+    drawBoard(canvas,g,{markers,last:lastMove,atariStones});
   }
 
   function place(x,y){
@@ -955,6 +1004,7 @@ function canvasToPoint(canvas, g, ev){
   document.getElementById('newBtn').addEventListener('click',()=>newGame(g.size));
   document.getElementById('scoreBtn').addEventListener('click',countScore);
   document.getElementById('showLibs').addEventListener('change',e=>{ showLibs=e.target.checked; if(!showLibs){hover=null;} render(); });
+  document.getElementById('showAtari').addEventListener('change',e=>{ showAtari=e.target.checked; render(); });
 
   document.querySelectorAll('.size-select button').forEach(b=>{
     b.addEventListener('click',()=>{
