@@ -72,7 +72,7 @@
 
   /* Layout for play page */
   .play-grid{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start;justify-content:center;}
-  .board-col{flex:0 0 auto;}
+  .board-col{flex:0 1 auto;min-width:0;}
   .side-col{flex:1 1 280px;min-width:260px;max-width:380px;}
 
   canvas{
@@ -80,6 +80,10 @@
     box-shadow:0 10px 30px rgba(0,0,0,.5);cursor:pointer;
     touch-action:manipulation;
   }
+  /* Main playing board scales to fit the page (width, viewport width, and height) */
+  #board{ width:min(540px, 88vw, 82vh); height:auto; max-width:100%; }
+  /* Lesson diagrams never overflow their card */
+  .lesson-board canvas{ max-width:100%; height:auto; }
 
   .controls{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;}
   button.btn{
